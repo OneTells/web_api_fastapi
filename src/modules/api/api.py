@@ -36,7 +36,7 @@ async def create_product(product: NewProduct, session: Annotated[AsyncSession, D
     return {"message": "Продукт добавлен", "id": response.first()[0]}
 
 
-@app.get("/products", response_model=list[ProductModel])
+@app.get("/products")
 async def get_products(session: Annotated[AsyncSession, Depends(get_async_session)]):
     response = await session.execute(
         select(Product.id, Product.slug, Product.name, Product.price)
@@ -61,7 +61,7 @@ async def delete_products(session: Annotated[AsyncSession, Depends(get_async_ses
     return {"message": "Все данные удалены"}
 
 
-@app.get("/products/{product_id}", response_model=ProductModel)
+@app.get("/products/{product_id}")
 async def get_product(product_id: int, session: Annotated[AsyncSession, Depends(get_async_session)]):
     response = await session.execute(
         select(Product.id, Product.slug, Product.name, Product.price)
