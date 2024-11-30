@@ -1,37 +1,42 @@
 from typing import Annotated
 
 from fastapi import FastAPI, Depends
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.model import Product
 from modules.api.methods import get_async_session
-from modules.api.schemes import ProductModel, CreateProductModel, UpdateProductModel
+from modules.api.schemes import ProductModel, NewProduct, UpdateProduct
 
 app = FastAPI()
 
 
 @app.post("/products", status_code=201)
-async def create_product(product: CreateProductModel, session: Annotated[AsyncSession, Depends(get_async_session)]):
-    response = await session.execute(
+async def create_product(product: NewProduct, session: Annotated[AsyncSession, Depends(get_async_session)]):
+    request = (
         insert(Product)
         .values(
             slug=product.url.removeprefix('https://www.maxidom.ru/catalog/').removesuffix('/'),
             name=product.name,
             price=product.price
         )
+    )
+
+    response = await session.execute(
+        request
         .on_conflict_do_update(
             index_elements=[Product.slug],
-            set_=dict(name=Product.name, price=Product.price)
-        ).returning(Product.id)
+            set_=dict(name=request.excluded.name, price=request.excluded.price)
+        )
+        .returning(Product.id)
     )
     await session.commit()
 
     return {"message": "Продукт добавлен", "id": response.first()[0]}
 
 
-@app.get("/products")
+@app.get("/products", response_model=list[ProductModel])
 async def get_products(session: Annotated[AsyncSession, Depends(get_async_session)]):
     response = await session.execute(
         select(Product.id, Product.slug, Product.name, Product.price)
@@ -56,7 +61,7 @@ async def delete_products(session: Annotated[AsyncSession, Depends(get_async_ses
     return {"message": "Все данные удалены"}
 
 
-@app.get("/products/{product_id}")
+@app.get("/products/{product_id}", response_model=ProductModel)
 async def get_product(product_id: int, session: Annotated[AsyncSession, Depends(get_async_session)]):
     response = await session.execute(
         select(Product.id, Product.slug, Product.name, Product.price)
@@ -68,20 +73,18 @@ async def get_product(product_id: int, session: Annotated[AsyncSession, Depends(
     if not result:
         return {"message": "Продукт не найден"}
 
-    return [
-        ProductModel(
-            id=result[0],
-            name=result[2],
-            price=result[3],
-            url=f'https://www.maxidom.ru/catalog/{result[1]}/'
-        )
-    ]
+    return ProductModel(
+        id=result[0],
+        name=result[2],
+        price=result[3],
+        url=f'https://www.maxidom.ru/catalog/{result[1]}/'
+    )
 
 
 @app.put("/products/{product_id}")
 async def update_product(
     product_id: int,
-    product: UpdateProductModel,
+    product: UpdateProduct,
     session: Annotated[AsyncSession, Depends(get_async_session)]
 ):
     response = await session.execute(
@@ -95,16 +98,13 @@ async def update_product(
         return {"message": "Продукт не найден"}
 
     await session.execute(
-        insert(Product)
+        update(Product)
         .values(
             slug=product.url.removeprefix('https://www.maxidom.ru/catalog/').removesuffix('/') if product.url else result[1],
             name=product.name or result[2],
             price=product.price or result[3]
         )
-        .on_conflict_do_update(
-            index_elements=[Product.slug],
-            set_=dict(name=Product.name, price=Product.price)
-        )
+        .where(product_id == Product.id)
     )
     await session.commit()
 
@@ -113,7 +113,15 @@ async def update_product(
 
 @app.delete("/products/{product_id}")
 async def delete_product(product_id: int, session: Annotated[AsyncSession, Depends(get_async_session)]):
+    response = await session.execute(
+        select(Product.id)
+        .where(product_id == Product.id)
+    )
+
+    if not response.first():
+        return {"message": "Продукт не найден"}
+
     await session.execute(delete(Product).where(product_id == Product.id))
     await session.commit()
 
-    return {"message": "Данные удалены"}
+    return {"message": "Продукт удален"}

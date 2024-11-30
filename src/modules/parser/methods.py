@@ -103,20 +103,22 @@ async def run_parser():
                 result = parser.parse_catalog('https://www.maxidom.ru/catalog/tovary-dlya-poliva/')
 
                 if result:
-                    await session.execute(
+                    request = (
                         insert(Product)
-                        .values(
-                            [
-                                {
-                                    'slug': product.url.removeprefix('https://www.maxidom.ru/catalog/').removesuffix('/'),
-                                    'name': product.name,
-                                    'price': product.price
-                                } for product in result
-                            ]
-                        )
+                        .values([
+                            {
+                                'slug': product.url.removeprefix('https://www.maxidom.ru/catalog/').removesuffix('/'),
+                                'name': product.name,
+                                'price': product.price
+                            } for product in result
+                        ])
+                    )
+
+                    await session.execute(
+                        request
                         .on_conflict_do_update(
                             index_elements=[Product.slug],
-                            set_=dict(name=Product.name, price=Product.price)
+                            set_=dict(name=request.excluded.name, price=request.excluded.price)
                         )
                     )
                     await session.commit()

@@ -1,16 +1,10 @@
 from pydantic import BaseModel
 
 
-class CreateProductModel(BaseModel):
+class NewProduct(BaseModel):
     name: str
     url: str
     price: int
-
-
-class UpdateProductModel(BaseModel):
-    name: str | None = None
-    url: str | None = None
-    price: int | None = None
 
 
 class ProductModel(BaseModel):
@@ -18,3 +12,9 @@ class ProductModel(BaseModel):
     name: str
     url: str
     price: int
+
+
+class UpdateProduct(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    price: int | None = None
