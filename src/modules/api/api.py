@@ -4,6 +4,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy import select, delete, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import Response, JSONResponse
 
 from core.model import Product
 from modules.api.methods import get_async_session
@@ -71,7 +72,7 @@ async def get_product(product_id: int, session: Annotated[AsyncSession, Depends(
     result = response.first()
 
     if not result:
-        return {"message": "Продукт не найден"}
+        return JSONResponse({"message": "Продукт не найден"}, status_code=404)
 
     return ProductModel(
         id=result[0],
@@ -95,7 +96,7 @@ async def update_product(
     result = response.first()
 
     if not result:
-        return {"message": "Продукт не найден"}
+        return JSONResponse({"message": "Продукт не найден"}, status_code=404)
 
     await session.execute(
         update(Product)
@@ -119,7 +120,7 @@ async def delete_product(product_id: int, session: Annotated[AsyncSession, Depen
     )
 
     if not response.first():
-        return {"message": "Продукт не найден"}
+        return JSONResponse({"message": "Продукт не найден"}, status_code=404)
 
     await session.execute(delete(Product).where(product_id == Product.id))
     await session.commit()
